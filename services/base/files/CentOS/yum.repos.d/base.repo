@@ -1,0 +1,5 @@
+[base]
+baseurl=http://192.168.7.1/linux/centos/6.4/os/x86_64
+gpgcheck=0
+enabled=1
+

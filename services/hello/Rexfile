@@ -1,0 +1,9 @@
+user "root";
+password "test";
+
+pass_auth;
+
+task "world", sub {
+   say operating_system . "\n";
+};
+

@@ -1,0 +1,36 @@
+user "root";
+password "test";
+
+pass_auth;
+
+task "repositories", sub {
+
+   if(operating_system =~ m/centos/i) {
+      run "rm /etc/yum.repos.d/*";
+
+      file "/etc/yum.repos.d/base.repo",
+         source => "files/CentOS/yum.repos.d/base.repo";
+
+      file "/etc/yum.repos.d/rex.repo",
+         source => "files/CentOS/yum.repos.d/rex.repo";
+
+      update_package_db;
+   }
+
+   elsif(operating_system =~ m/debian/i) {
+      file "/etc/apt/sources.list",
+         source => "files/Debian/sources.list";
+
+      update_package_db;
+   }
+
+   elsif(operating_system =~ m/ubuntu/i) {
+      rm "/etc/dpkg/dpkg.cfg.d/multiarch";
+      file "/etc/apt/sources.list",
+         source => "files/Ubuntu/sources.list";
+
+      update_package_db;
+   }
+
+};
+

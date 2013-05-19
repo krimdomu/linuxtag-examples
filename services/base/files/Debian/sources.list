@@ -1,0 +1,12 @@
+# deb http://192.168.1.6/linux/ftp.de.debian.org/debian wheezy main
+
+deb http://192.168.1.6/linux/ftp.de.debian.org/debian wheezy main non-free contrib
+# Line commented out by installer because it failed to verify:
+#deb-src http://192.168.1.6/linux/ftp.de.debian.org/debian wheezy main non-free contrib
+
+## rex repository
+deb http://192.168.7.1/rex/debian wheezy rex
+
+deb http://192.168.1.6/linux/security.debian.org/ wheezy/updates main contrib non-free
+# Line commented out by installer because it failed to verify:
+#deb-src http://192.168.1.6/ wheezy/updates main contrib non-free

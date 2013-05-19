@@ -1,0 +1,75 @@
+use Rex -base;
+use Data::Dumper;
+use JSON::XS;
+
+
+user "root";
+password "test";
+
+pass_auth;
+
+include 'Rex::DNS::Bind';
+
+set dns => {
+   server   => "127.0.0.1",
+   key      => "IQGzNua9bGZAecUU3pmLLw==",
+   key_name => "rexio",
+};
+
+task "setup", sub {
+
+   my $op       = operating_system;
+   my $packages = case $op, {
+                    Debian => ["heartbeat"],
+                    Ubuntu => ["heartbeat"],
+                 };
+
+   install $packages;
+
+   write_heartbeat_conf();
+};
+
+task "write_heartbeat_conf", sub {
+
+   my $op = operating_system;
+   my %info = get_system_information;
+
+   my @dns_entries = Rex::DNS::Bind::list_entries({
+      domain => $info{domain},
+   });
+
+   my ($txt) = grep { 
+                         ($_->{name} eq "$info{hostname}.$info{domain}")
+                      && ($_->{type} eq "TXT")
+                     } @dns_entries;
+
+   my $ref;
+   eval {
+      $ref  = decode_json($txt->{data});
+   } or do {
+      # this is really strange... must be a bug in Net::DNS
+      eval {
+         $ref = decode_json(substr($txt->{data}, 1));
+      } or do {
+         print "Can't decode json: $@\n";
+         die;
+      };
+   };
+
+   # {"ld":{"192.168.7.101:80":"fe\\d+"},"hb":{"vip":{"192.168.7.101":"db01"},"cl":["db01","db02"]}}
+
+
+   file "/etc/ha.d/ha.cf",
+      content => template("files/$op/etc/ha.d/ha.cf",
+                    config => $ref->{hb},
+                 );
+   file "/etc/ha.d/authkeys",
+      source => "files/$op/etc/ha.d/authkeys",
+      mode   => 600;
+
+   file "/etc/ha.d/haresources",
+      content => template("files/$op/etc/ha.d/haresources",
+                    config => $ref->{hb},
+                 );
+};
+

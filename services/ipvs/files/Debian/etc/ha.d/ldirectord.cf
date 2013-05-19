@@ -1,0 +1,20 @@
+# :vim:set expandtab!:
+
+checktimeout  = 10
+checkinterval = 2
+autoreload    = no
+logfile       = "local0"
+quiescent     = yes
+
+<% for my $service (keys %{ $services }) { %>
+virtual = <%= $service %>
+	#<% for my $real (@{ $services->{$service} }) { %>
+	real = <%= $real %> gate 100
+	#<% } %>
+	service = http
+	request = "/check.html"
+	receive = "OK: all"
+	scheduler = rr
+	protocol = tcp
+	checktype = negotiate
+<% } %>

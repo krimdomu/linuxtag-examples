@@ -1,0 +1,21 @@
+=pod
+
+=head3 Demonstration Things for the Linuxtag
+
+These are just some example Rex Tasks that will be shown on Linuxtag.
+
+=head3 CONTENTS
+
+=over 4
+
+=item *
+
+IPVS
+
+=item *
+
+Heartbeat
+
+=back
+
+

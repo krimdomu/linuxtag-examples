@@ -1,0 +1,5 @@
+[rex]
+baseurl=http://192.168.7.1/rex/CentOS/6/rex/x86_64
+gpgcheck=0
+enabled=1
+

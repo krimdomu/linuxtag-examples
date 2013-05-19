@@ -1,0 +1,6 @@
+#<% for my $vip (keys %{ $config->{vip} }) { %>
+#<% my $broadcast = $vip; $broadcast =~ s/\.\d+$/\.255/; %>
+<%= $config->{vip}->{$vip} %> \
+ ldirectord::ldirectord.cf \
+ IPaddr2::<%= $vip %>/24/eth0/<%= $broadcast %>
+#<% } %>
