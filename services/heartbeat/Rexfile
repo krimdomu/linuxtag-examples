@@ -27,6 +27,8 @@ task "setup", sub {
    install $packages;
 
    write_heartbeat_conf();
+
+   start();
 };
 
 task "write_heartbeat_conf", sub {
@@ -71,5 +73,9 @@ task "write_heartbeat_conf", sub {
       content => template("files/$op/etc/ha.d/haresources",
                     config => $ref->{hb},
                  );
+};
+
+task "start", sub {
+   service heartbeat => "start";
 };
 
