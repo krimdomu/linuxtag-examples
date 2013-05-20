@@ -1,6 +1,14 @@
 #<% for my $vip (keys %{ $config->{vip} }) { %>
 #<% my $broadcast = $vip; $broadcast =~ s/\.\d+$/\.255/; %>
-<%= $config->{vip}->{$vip} %> \
- ldirectord::ldirectord.cf \
- IPaddr2::<%= $vip %>/24/eth0/<%= $broadcast %>
+<%= $config->{vip}->{$vip}->{m} %> \
+<% my $i = 1; %>
+<% my $size = scalar(@{ $config->{vip}->{$vip}->{t} }); %>
+<% for my $service (@{ $config->{vip}->{$vip}->{t} }) { %>
+<% if($service eq "ldir") { %>
+ ldirectord::ldirectord.cf <% if($i < $size) { %>\<% } %>
+<% } elsif($service eq "ip") { %>
+ IPaddr2::<%= $vip %>/24/eth0/<%= $broadcast %> <% if($i < $size) { %>\<% } %>
+<% } %>
+<% $i++; %>
+<% } %>
 #<% } %>

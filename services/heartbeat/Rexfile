@@ -60,6 +60,14 @@ task "write_heartbeat_conf", sub {
 
    # {"ld":{"192.168.7.101:80":"fe\\d+"},"hb":{"vip":{"192.168.7.101":"db01"},"cl":["db01","db02"]}}
 
+   for my $vip (keys %{ $ref->{hb}->{vip} }) {
+      if(! ref $ref->{hb}->{vip}->{$vip}) {
+         $ref->{hb}->{vip}->{$vip} = {
+            m => $ref->{hb}->{vip}->{$vip},
+            t => ["ldir", "ip"],
+         };
+      }
+   }
 
    file "/etc/ha.d/ha.cf",
       content => template("files/$op/etc/ha.d/ha.cf",
@@ -69,10 +77,13 @@ task "write_heartbeat_conf", sub {
       source => "files/$op/etc/ha.d/authkeys",
       mode   => 600;
 
-   file "/etc/ha.d/haresources",
-      content => template("files/$op/etc/ha.d/haresources",
+   my @hares_lines = split(/\n/, template("files/$op/etc/ha.d/haresources",
                     config => $ref->{hb},
-                 );
+               ));
+
+   file "/etc/ha.d/haresources",
+      content => join("\n", grep { ! /^$/ } @hares_lines);
+
 };
 
 task "start", sub {
