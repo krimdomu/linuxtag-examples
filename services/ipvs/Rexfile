@@ -134,13 +134,20 @@ task "write_ldirectory_conf", sub {
 
    my %ld_service;
 
-   for my $entry (@dns_entries) {
-      next if ($entry->{type} ne "A");
+   for my $service (keys %{ $ref->{ld} }) {
+      my ($service_ip, $port) = ($service =~ m/^([^:]+):(\d+)$/);
+      my $dns_name = get_ptr($service_ip);
 
-      for my $service (keys %{ $ref->{ld} }) {
-         my ($port) = ($service =~ m/:(\d+)$/);
+      $ld_service{$service} = {
+         dns_name => $dns_name,
+         real     => [],
+      };
+
+      for my $entry (@dns_entries) {
+         next if ($entry->{type} ne "A");
+
          if($entry->{name} =~ $ref->{ld}->{$service}) {
-            push @{$ld_service{$service}}, $entry->{data}. ":$port";
+            push @{$ld_service{$service}->{real}}, $entry->{data}. ":$port";
          }
       }
    }
@@ -152,4 +159,21 @@ task "write_ldirectory_conf", sub {
 
 };
 
+sub get_ptr {
+   my ($ip) = @_;
+   
+   my @splitted_ip = split(/\./, $ip);
 
+   my @domain = reverse @splitted_ip;
+   push @domain, "IN-ADDR.ARPA";
+
+   my $name = join(".", @domain);
+   shift @domain;
+
+   my @dns_entries = Rex::DNS::Bind::list_entries({
+      domain => join(".", @domain),
+   });
+
+   my ($dns_name) =  map { $_ = $_->{data} } grep { $_->{name} eq $name } @dns_entries;
+   return $dns_name;
+}

@@ -2,16 +2,17 @@
 
 checktimeout  = 10
 checkinterval = 2
-autoreload    = no
+autoreload    = yes
 logfile       = "local0"
 quiescent     = yes
 
 <% for my $service (keys %{ $services }) { %>
 virtual = <%= $service %>
-	#<% for my $real (@{ $services->{$service} }) { %>
+	#<% for my $real (@{ $services->{$service}->{real} }) { %>
 	real = <%= $real %> gate 100
 	#<% } %>
 	service = http
+	virtualhost = <%= $services->{$service}->{dns_name} %>
 	request = "/check.html"
 	receive = "OK: all"
 	scheduler = rr
