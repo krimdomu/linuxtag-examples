@@ -75,6 +75,8 @@ task "init_drbd", sub {
       Rex::Logger::info("Is master");
       run "drbdadm -- --overwrite-data-of-peer primary r" . $res->{id};
 
+      run "mkfs.xfs /dev/drbd" . $re->{id};
+
       mount "/dev/drbd" . $res->{id} => $mount,
          options => [qw/noatime/],
          persistent => TRUE;

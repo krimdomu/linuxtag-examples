@@ -1,0 +1,14 @@
+#!/bin/sh
+# fake init script for heartbeat
+
+case "$1" in
+   start)
+      echo "start"
+   ;;
+   stop)
+      echo "stop"
+   ;;
+   status)
+      echo "status"
+   ;;
+esac

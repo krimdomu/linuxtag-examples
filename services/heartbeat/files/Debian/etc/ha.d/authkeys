@@ -1,2 +1,2 @@
 auth 3
-3 md5 djhfs87dfhksdfkjh
+3 md5 <%= $authkey %>

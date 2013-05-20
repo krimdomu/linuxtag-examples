@@ -1,6 +1,5 @@
 logfacility local0
-bcast eth0
-mcast eth0 225.0.0.1 694 1 0
+mcast eth0 225.0.0.<%= $rnd %> 694 1 0
 auto_failback off
 #<% for my $node (@{ $config->{cl} }) { %>
 node <%= $node %>

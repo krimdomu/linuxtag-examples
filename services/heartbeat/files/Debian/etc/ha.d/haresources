@@ -8,6 +8,10 @@
  ldirectord::ldirectord.cf <% if($i < $size) { %>\<% } %>
 <% } elsif($service eq "ip") { %>
  IPaddr2::<%= $vip %>/24/eth0/<%= $broadcast %> <% if($i < $size) { %>\<% } %>
+<% } elsif($service eq "drbd") { %>
+ drbddisk::r0 Filesystem::/dev/drbd0::/var/lib/mysql::xfs <% if($i < $size) { %>\<% } %>
+<% } elsif($service eq "mysql") { %>
+ mysql <% if($i < $size) { %>\<% } %>
 <% } %>
 <% $i++; %>
 <% } %>

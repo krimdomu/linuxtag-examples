@@ -1,6 +1,7 @@
 use Rex -base;
 use Data::Dumper;
 use JSON::XS;
+use Digest::MD5 'md5_hex';
 
 
 user "root";
@@ -25,6 +26,13 @@ task "setup", sub {
                  };
 
    install $packages;
+
+   # fake init script file for mysql if not yet installed
+   if(! is_file("/etc/init.d/mysql")) {
+      file "/etc/init.d/mysql",
+         source => "files/$op/etc/init.d/mysql",
+         mode   => 755;
+   }
 
    write_heartbeat_conf();
 
@@ -69,12 +77,20 @@ task "write_heartbeat_conf", sub {
       }
    }
 
+   my ($authkey) = keys %{ $ref->{hb}->{vip} };
+   my ($rnd) = ($authkey =~ m/\.(\d+)$/);
+
+   $authkey = md5_hex($authkey);
+
+
    file "/etc/ha.d/ha.cf",
       content => template("files/$op/etc/ha.d/ha.cf",
                     config => $ref->{hb},
+                    rnd    => $rnd,
                  );
+
    file "/etc/ha.d/authkeys",
-      source => "files/$op/etc/ha.d/authkeys",
+      content => template("files/$op/etc/ha.d/authkeys", authkey => $authkey),
       mode   => 600;
 
    my @hares_lines = split(/\n/, template("files/$op/etc/ha.d/haresources",
