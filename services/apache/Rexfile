@@ -1,0 +1,146 @@
+use Rex -base;
+use Data::Dumper;
+use JSON::XS;
+
+
+user "root";
+password "test";
+
+pass_auth;
+
+include 'Rex::DNS::Bind';
+
+set dns => {
+   server   => "127.0.0.1",
+   key      => "IQGzNua9bGZAecUU3pmLLw==",
+   key_name => "rexio",
+};
+
+task "setup", sub {
+
+   my $op       = operating_system;
+   my $packages = case $op, {
+                    Debian => ["apache2"],
+                    Ubuntu => ["apache2"],
+                    CentOS => ["httpd"],
+                 };
+
+   my $apache_user = case $op, {
+                        Debian => "www-data",
+                        Ubuntu => "www-data",
+                        CentOS => "nobody",
+                     };
+
+   my $apache_group = case $op, {
+                        Debian => "www-data",
+                        Ubuntu => "www-data",
+                        CentOS => "nogroup",
+                     };
+
+   my $config_dir   = case $op, {
+                        Debian => "apache2",
+                        Ubuntu => "apache2",
+                        CentOS => "httpd",
+                     };
+
+   install $packages;
+
+   file "/etc/$config_dir/apache2.conf",
+      source => "files/$op/etc/apache2/apache2.conf";
+
+   file "/etc/$config_dir/conf.d/charset",
+      source => "files/$op/etc/apache2/conf.d/charset";
+
+   file "/etc/$config_dir/sites-enabled/000-default",
+      source => "files/$op/etc/apache2/vhost-default.conf";
+
+   mkdir ["/var/www/default", "/var/www/default/logs", "/var/www/default/htdocs"],
+      owner => $apache_user,
+      group => $apache_group;
+
+   write_apache_vhosts();
+
+   start();
+};
+
+task "write_apache_vhosts", sub {
+
+   my $op = operating_system;
+   my %info = get_system_information;
+
+   my $apache_user = case $op, {
+                        Debian => "www-data",
+                        Ubuntu => "www-data",
+                        CentOS => "nobody",
+                     };
+
+   my $apache_group = case $op, {
+                        Debian => "www-data",
+                        Ubuntu => "www-data",
+                        CentOS => "nogroup",
+                     };
+
+   my $config_dir   = case $op, {
+                        Debian => "apache2",
+                        Ubuntu => "apache2",
+                        CentOS => "httpd",
+                     };
+
+
+   my @dns_entries = Rex::DNS::Bind::list_entries({
+      domain => $info{domain},
+   });
+
+   my ($txt) = grep { 
+                         ($_->{name} eq "$info{hostname}.$info{domain}")
+                      && ($_->{type} eq "TXT")
+                     } @dns_entries;
+
+   my $ref;
+   eval {
+      $ref  = decode_json($txt->{data});
+   } or do {
+      # this is really strange... must be a bug in Net::DNS
+      eval {
+         $ref = decode_json(substr($txt->{data}, 1));
+      } or do {
+         print "Can't decode json: $@\n";
+         die;
+      };
+   };
+
+   # {"vh":["www.stage.rexify.org"]}
+
+   for my $host (@{ $ref->{vh} }) {
+
+      my ($ip) = grep { ($_->{type} eq "A" && $_->{name} eq $host) ? $_ = $_->{data} : undef } @dns_entries;
+
+      if(! $ip) {
+         # ip not found, so just skip this vhost
+         next;
+      }
+
+      # create directory structure
+      mkdir ["/var/www/$host", "/var/www/$host/logs", "/var/www/$host/htdocs"],
+         group => $apache_group,
+         owner => $apache_user;
+
+      # upload configuration file
+      file "/etc/$config_dir/sites-enabled/$host.conf",
+         content => template("files/$op/etc/apache2/vhost.conf",
+                       config => { name => $host, ip => $ip },
+                    );
+   }
+};
+
+task "start", sub {
+   my $service = case operating_system, {
+                    Debian => ["apache2"],
+                    Ubuntu => ["apache2"],
+                    CentOS => ["httpd"],
+                 };
+
+   service $service => ensure => "started";
+   service $service => "reload";
+};
+

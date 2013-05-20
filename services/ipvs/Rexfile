@@ -42,6 +42,67 @@ task "setup", sub {
    write_ldirectory_conf();
 };
 
+task "setup_node", sub {
+
+   my $op       = operating_system;
+   my %info = get_system_information;
+
+   my $packages = case $op, {
+                     Debian => ["iproute"],
+                     Ubuntu => ["iproute"],
+                  };
+
+   my @dns_entries = Rex::DNS::Bind::list_entries({
+      domain => $info{domain},
+   });
+
+   my ($txt) = grep { 
+                         ($_->{name} eq "$info{hostname}.$info{domain}")
+                      && ($_->{type} eq "TXT")
+                     } @dns_entries;
+
+   my $ref;
+   eval {
+      $ref  = decode_json($txt->{data});
+   } or do {
+      # this is really strange... must be a bug in Net::DNS
+      eval {
+         $ref = decode_json(substr($txt->{data}, 1));
+      } or do {
+         print "Can't decode json: $@\n";
+         die;
+      };
+   };
+
+   # {"vh":["www.stage.rexify.org"],"ld":["www.stage.rexify.org"]}
+
+   file "/etc/sysctl.conf",
+      source => "files/$op/etc/sysctl.conf.node";
+
+   run "sysctl -p";
+
+   for my $vhost (@{ $ref->{ld} }) {
+      ($vhost) = grep { ($_->{type} eq "A" && $_->{name} eq $vhost) ? $_ = $_->{data} : undef } @dns_entries;
+   }
+
+   file "/etc/network/interfaces",
+      content => template("files/$op/etc/network/interfaces.node",
+                    config => $ref->{ld},
+                 );
+    
+    # sometimes it is better to do it twice...
+    # especially if ip changed
+    my $i = 0;
+    for (@{ $ref->{ld} }) {
+       run "ifup lo:$i";
+       run "ifdown lo:$i";
+       run "ifup lo:$i";
+       $i++;
+    }
+
+};
+
+
 task "write_ldirectory_conf", sub {
 
    my $op = operating_system;
@@ -90,4 +151,5 @@ task "write_ldirectory_conf", sub {
                  );
 
 };
+
 
