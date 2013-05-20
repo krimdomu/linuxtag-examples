@@ -140,7 +140,6 @@ task "start", sub {
                     CentOS => ["httpd"],
                  };
 
-   service $service => ensure => "started";
-   service $service => "reload";
+   service $service => "restart";
 };
 
