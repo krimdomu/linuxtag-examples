@@ -28,6 +28,9 @@ task "setup", sub {
 
    install $packages;
 
+   file "/etc/drbd.d/global_common.conf",
+      source => "files/$op/etc/drbd.d/global_common.conf";
+
    write_drbd_conf();
 
 };
@@ -61,6 +64,8 @@ task "init_drbd", sub {
 
    # first umount
    umount $mount;
+
+   delete_lines_matching "/etc/fstab", matching => qr{$mount};
 
    # zero out
    run "dd if=/dev/zero of=/dev/vg/var_lib_mysql bs=1M count=10";

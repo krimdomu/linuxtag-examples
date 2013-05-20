@@ -1,0 +1,68 @@
+use Rex -base;
+use Data::Dumper;
+use JSON::XS;
+use Digest::MD5 'md5_hex';
+
+
+user "root";
+password "test";
+
+pass_auth;
+
+task "setup", sub {
+
+   my $op       = operating_system;
+   my $packages = case $op, {
+                    Debian => ["mysql-server"],
+                    Ubuntu => ["mysql-server"],
+                 };
+                 
+
+   my $mysql_user = case $op, {
+                     Debian => "mysql",
+                     Ubuntu => "mysql",
+                  };
+
+   my $mysql_group = case $op, {
+                     Debian => "mysql",
+                     Ubuntu => "mysql",
+                  };
+
+   # if fake initscript, remove it
+   if(is_file("/etc/init.d/mysql")) {
+      unlink "/etc/init.d/mysql";
+   }
+
+   # ensure correct permissions
+   install $packages;
+
+   # check if /var/lib/mysql is mounted.
+   # if not remove contents of /var/lib/mysql
+   my @mount = grep { /\/var\/lib\/mysql/ } run "mount";
+
+   if(scalar(@mount) == 0) {
+      service mysql => "stop";
+
+      rmdir "/var/lib/mysql";
+      mkdir "/var/lib/mysql",
+         owner => $mysql_user,
+         group => $mysql_group;
+   }
+   else {
+      chown $mysql_user, "/var/lib/mysql", recursive => TRUE;
+      chgrp $mysql_group, "/var/lib/mysql", recursive => TRUE;
+   }
+};
+
+task "start", sub {
+
+   my $op       = operating_system;
+   my $service  = case $op, {
+                    Debian => ["mysql"],
+                    Ubuntu => ["mysql"],
+                 };
+
+   service $service => "restart";
+
+};
+
