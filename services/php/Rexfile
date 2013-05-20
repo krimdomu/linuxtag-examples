@@ -1,0 +1,24 @@
+use Rex -base;
+use Data::Dumper;
+
+
+user "root";
+password "test";
+
+pass_auth;
+
+task "setup", sub {
+
+   my $op       = operating_system;
+   my $packages = case $op, {
+                    Debian => ["libapache2-mod-php5", "php5", "php5-mysql", "php-apc"],
+                    Ubuntu => ["libapache2-mod-php5", "php5", "php5-mysql", "php-apc"],
+                 };
+
+   install $packages;
+
+   file "/etc/php5/apache2/php.ini",
+      source => "files/$op/etc/php5/apache2/php.ini";
+
+};
+

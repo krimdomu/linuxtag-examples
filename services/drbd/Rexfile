@@ -1,0 +1,184 @@
+use Rex -base;
+use Data::Dumper;
+use JSON::XS;
+use Digest::MD5 'md5_hex';
+use POSIX 'strftime';
+
+
+user "root";
+password "test";
+
+pass_auth;
+
+include 'Rex::DNS::Bind';
+
+set dns => {
+   server   => "127.0.0.1",
+   key      => "IQGzNua9bGZAecUU3pmLLw==",
+   key_name => "rexio",
+};
+
+task "setup", sub {
+
+   my $op       = operating_system;
+   my $packages = case $op, {
+                    Debian => ["drbd8-utils"],
+                    Ubuntu => ["drbd8-utils"],
+                 };
+
+   install $packages;
+
+   write_drbd_conf();
+
+};
+
+task "init_drbd", sub {
+
+   my $res = shift;
+
+   my %info = get_system_information;
+
+   if(! exists $res->{type}) {
+      die("No type found.");
+   }
+
+   my ($mount);
+
+   if($res->{type} eq "mysql") {
+      $mount = "/var/lib/mysql";
+   }
+
+   if(! $mount) {
+      die("No mountpoint given");
+   }
+
+   my $status_file = "/etc/drbd.d/" . $res->{type} . "_" . $res->{id} . ".res.status";
+
+   if(is_file($status_file)) {
+      # everything is done
+      return;
+   }
+
+   # first umount
+   umount $mount;
+
+   # zero out
+   run "dd if=/dev/zero of=/dev/vg/var_lib_mysql bs=1M count=10";
+
+   # initialize drbd
+   run "drbdadm create-md r0";
+
+   service drbd => "start";
+
+   # set to primary, if master
+   if($res->{server}->[0]->{name} eq $info{hostname}) {
+      Rex::Logger::info("Is master");
+      run "drbdadm -- --overwrite-data-of-peer primary r" . $res->{id};
+
+      mount "/dev/drbd" . $res->{id} => $mount,
+         options => [qw/noatime/],
+         persistent => TRUE;
+   }
+   
+   file $status_file,
+      content => "drbd setup on: " . strftime("%Y-%m-%d %H:%M:%S", localtime(time)) . "\n";
+
+};
+
+task "write_drbd_conf", sub {
+
+   my $op = operating_system;
+   my %info = get_system_information;
+
+   my @dns_entries = Rex::DNS::Bind::list_entries({
+      domain => $info{domain},
+   });
+
+   my ($txt) = grep { 
+                         ($_->{name} eq "$info{hostname}.$info{domain}")
+                      && ($_->{type} eq "TXT")
+                     } @dns_entries;
+
+   my $ref;
+   eval {
+      $ref  = decode_json($txt->{data});
+   } or do {
+      # this is really strange... must be a bug in Net::DNS
+      eval {
+         $ref = decode_json(substr($txt->{data}, 1));
+      } or do {
+         print "Can't decode json: $@\n";
+         die;
+      };
+   };
+
+   # {"drbd":{"t":"mysql","m":"db02"},"hb":{"vip":{"192.168.7.171":{"m":"db01","t":"mysql"}}}}
+
+   if(ref $ref->{drbd} eq "HASH") {
+      $ref->{drbd} = [ $ref->{drbd} ];
+   }
+
+   my $i = 0;
+   for my $res_p (@{ $ref->{drbd} }) {
+
+      my $disk;
+      if($res_p->{t} eq "mysql") {
+         $disk = "/dev/vg/var_lib_mysql";
+      }
+
+      if(! $disk) {
+         die("Error: no disk defined.");
+      }
+
+      my $res = {
+         id      => $i,
+         secret  => md5_hex($res_p->{s}),
+         disk    => $disk,
+         type    => $res_p->{t},
+         server  => [],
+      };
+
+      for my $res_m (@{ $res_p->{m} }) {
+
+         my ($addr) = grep { $_->{type} eq "A" && $_->{name} eq "$res_m.$info{domain}" } @dns_entries;
+
+         my $member = {
+            name    => $res_m,
+            address => $addr->{data},
+         };
+
+         push @{ $res->{server} }, $member;
+      }
+
+      file "/etc/drbd.d/" . $res_p->{t} . "_$i.res",
+         content => template("files/$op/etc/drbd.d/default.res",
+                       res => $res,
+                    );
+
+      init_drbd($res);
+
+      $i++;
+   }
+
+
+};
+
+sub get_ptr {
+   my ($ip) = @_;
+   
+   my @splitted_ip = split(/\./, $ip);
+
+   my @domain = reverse @splitted_ip;
+   push @domain, "IN-ADDR.ARPA";
+
+   my $name = join(".", @domain);
+   shift @domain;
+
+   my @dns_entries = Rex::DNS::Bind::list_entries({
+      domain => join(".", @domain),
+   });
+
+   my ($dns_name) =  map { $_ = $_->{data} } grep { $_->{name} eq $name } @dns_entries;
+   return $dns_name;
+}
+
